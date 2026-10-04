@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, CameraOff, AlertCircle, RefreshCw } from 'lucide-react';
+import { Camera, CameraOff, AlertCircle } from 'lucide-react';
 
 interface BarcodeScannerProps {
   onScan: (decodedText: string) => void;
@@ -19,13 +19,12 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const regionId = 'reader';
 
-  // Get available cameras
+  // Get available cameras silently without persistent error alert if camera missing or blocked initially
   useEffect(() => {
     Html5Qrcode.getCameras()
       .then((devices) => {
         if (devices && devices.length > 0) {
           setCameras(devices);
-          // Default to back camera if available (usually contains 'back' or 'environment')
           const backCamera = devices.find(
             (device) =>
               device.label.toLowerCase().includes('back') ||
@@ -33,13 +32,11 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
               device.label.toLowerCase().includes('environment')
           );
           setSelectedCameraId(backCamera ? backCamera.id : devices[devices.length - 1].id);
-        } else {
-          setError('Nenalezena žádná kamera v zařízení.');
         }
       })
       .catch((err) => {
-        console.error('Chyba při zjišťování kamer:', err);
-        setError('Nelze přistoupit ke kameře. Zkontrolujte oprávnění v prohlížeči.');
+        // Silently catch error on initial load (e.g. PC without camera or before user clicks start)
+        console.warn('Kamera není dostupná:', err);
       });
   }, []);
 
@@ -74,7 +71,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         cameraConfig,
         config,
         (decodedText) => {
-          // Play audio beep tone on successful scan
+          // Audio feedback
           try {
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
             const osc = audioCtx.createOscillator();
@@ -91,15 +88,13 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
 
           onScan(decodedText);
         },
-        () => {
-          // Scanning in progress (no barcode in frame yet)
-        }
+        () => {}
       );
 
       setIsScanning(true);
     } catch (err: any) {
       console.error('Chyba při spuštění skeneru:', err);
-      setError('Nepodařilo se spustit kameru. ' + (err?.message || ''));
+      setError('Nepodařilo se spustit kameru. Zkontrolujte připojení kamery a oprávnění v prohlížeči.');
       setIsScanning(false);
     }
   };
